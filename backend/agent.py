@@ -44,6 +44,7 @@ class SearchRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=200)
     mode: SearchMode = "agent"
     limit: int = Field(default=12, ge=1, le=50)
+    rerank: bool = Field(default=True, description="Apply Cohere reranking")
 
 
 class ImageResult(BaseModel):
@@ -306,7 +307,10 @@ async def _run_hybrid(request: SearchRequest) -> SearchResponse:
     kw = _keyword_search(request.query, size=size)
     desc = _description_embedding_search(request.query, size=size)
     candidates = _rrf_merge([kw, desc])
-    results = _rerank(request.query, candidates, request.limit)
+    if request.rerank:
+        results = _rerank(request.query, candidates, request.limit)
+    else:
+        results = candidates[:request.limit]
     return SearchResponse(
         results=_to_image_results(results),
         mode_used="hybrid",
