@@ -21,6 +21,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
+from openai import OpenAI
 from opensearchpy import OpenSearch
 from pydantic import BaseModel, Field
 from transformers import CLIPModel, CLIPProcessor
@@ -89,6 +90,7 @@ OS_INDEX = os.getenv("OPENSEARCH_INDEX", "multimodal-images")
 _clip_model: CLIPModel | None = None
 _clip_processor: CLIPProcessor | None = None
 _clip_device: str | None = None
+_openai_embed_client: OpenAI | None = None
 
 
 def _get_clip() -> tuple[CLIPModel, CLIPProcessor, str]:
@@ -110,11 +112,17 @@ def _get_clip() -> tuple[CLIPModel, CLIPProcessor, str]:
 def _hit_to_dict(h: dict, score: float) -> dict:
     s = h["_source"]
     image_url = s.get("photo_image_url", s.get("photo_url", ""))
+    description = (
+        s.get("llm_description")
+        or s.get("ai_description")
+        or s.get("original_description")
+        or s.get("photo_description", "")
+    )
     return {
         "id": s.get("photo_id", h["_id"]),
         "url": image_url,
         "thumbnail_url": f"{image_url}?w=400&q=80",
-        "description": s.get("llm_description") or s.get("original_description", ""),
+        "description": description,
         "score": round(score, 4),
         "source": "internal",
         "tags": s.get("tags", []),
@@ -130,7 +138,11 @@ def _keyword_search(query: str, size: int = 20) -> list[dict]:
             "query": {
                 "multi_match": {
                     "query": query,
-                    "fields": ["original_description^2", "llm_description^1.5", "tags"],
+                    "fields": [
+                        "original_description^2", "photo_description^2",
+                        "llm_description^1.5", "ai_description^1.5",
+                        "tags",
+                    ],
                     "type": "best_fields",
                     "fuzziness": "AUTO",
                 }
@@ -152,6 +164,27 @@ def _embed_clip(text: str) -> list[float]:
         features = model.text_projection(pooled)                # (1, projection_dim)
     features = features / features.norm(dim=-1, keepdim=True)
     return features.cpu().numpy().flatten().tolist()
+
+
+def _embed_text(text: str) -> list[float]:
+    global _openai_embed_client
+    if _openai_embed_client is None:
+        _openai_embed_client = OpenAI()
+    resp = _openai_embed_client.embeddings.create(input=text, model="text-embedding-3-small")
+    return resp.data[0].embedding
+
+
+def _description_search(query: str, size: int = 20) -> list[dict]:
+    logger.info(f"[OS] description embedding search — query={query!r}")
+    vector = _embed_text(query)
+    resp = _os_client().search(
+        index=OS_INDEX,
+        body={"size": size, "query": {"knn": {"description_embedding": {"vector": vector, "k": size}}}},
+    )
+    hits = resp["hits"]["hits"]
+    logger.info(f"[OS] description kNN returned {len(hits)} hits")
+    max_score = max((h["_score"] for h in hits), default=1.0)
+    return [_hit_to_dict(h, h["_score"] / max_score) for h in hits]
 
 
 def _clip_search(query: str, size: int = 20) -> list[dict]:
@@ -197,6 +230,24 @@ def _pexels_search(query: str, limit: int = 12) -> list[dict]:
     except Exception as e:
         logger.warning(f"[Pexels] error: {e}")
         return []
+
+
+def _rrf_merge(lists: list[list[dict]], k: int = 60) -> list[dict]:
+    """Reciprocal Rank Fusion — rank-based fusion that's robust to score scale differences."""
+    rrf_scores: dict[str, float] = {}
+    best: dict[str, dict] = {}
+    for ranked in lists:
+        for rank, doc in enumerate(ranked):
+            doc_id = doc["id"]
+            rrf_scores[doc_id] = rrf_scores.get(doc_id, 0.0) + 1.0 / (k + rank + 1)
+            if doc_id not in best or doc["score"] > best[doc_id]["score"]:
+                best[doc_id] = doc
+
+    merged = sorted(best.values(), key=lambda d: rrf_scores[d["id"]], reverse=True)
+    top = rrf_scores[merged[0]["id"]] if merged else 1.0
+    for doc in merged:
+        doc["score"] = round(rrf_scores[doc["id"]] / top, 4)
+    return merged
 
 
 def _confidence(results: list[dict]) -> float:
@@ -252,22 +303,9 @@ async def _run_external(request: SearchRequest) -> SearchResponse:
 
 async def _run_hybrid(request: SearchRequest) -> SearchResponse:
     size = request.limit * 2
-    kw = _keyword_search(request.query, size=size)   # scores normalized 0-1
-    cl = _clip_search(request.query, size=size)      # scores normalized 0-1
-
-    kw_map = {r["id"]: r for r in kw}
-    cl_map = {r["id"]: r for r in cl}
-
-    merged: dict[str, dict] = {}
-    for id, r in kw_map.items():
-        merged[id] = {**r, "score": r["score"] * 0.5}
-    for id, r in cl_map.items():
-        if id in merged:
-            merged[id]["score"] = round(merged[id]["score"] + r["score"] * 0.5, 4)
-        else:
-            merged[id] = {**r, "score": round(r["score"] * 0.5, 4)}
-
-    candidates = sorted(merged.values(), key=lambda r: r["score"], reverse=True)
+    kw = _keyword_search(request.query, size=size)
+    desc = _description_search(request.query, size=size)
+    candidates = _rrf_merge([kw, desc])
     results = _rerank(request.query, candidates, request.limit)
     return SearchResponse(
         results=_to_image_results(results),
@@ -284,17 +322,20 @@ async def _run_react_agent(request: SearchRequest) -> SearchResponse:
     collected: list[dict] = []
 
     @tool
-    def search_internal(query: str) -> str:
-        """Search the internal Unsplash image library by keyword. Use for named subjects, specific objects, people, places, or activities."""
-        results = _keyword_search(query, size=request.limit * 2)
+    def search_hybrid(query: str) -> str:
+        """Search the internal library using keyword matching and semantic description embeddings fused with RRF. Best for descriptive, factual, or subject-based queries: people, places, objects, activities, or natural language descriptions."""
+        size = request.limit * 2
+        kw = _keyword_search(query, size=size)
+        desc = _description_search(query, size=size)
+        results = _rrf_merge([kw, desc])
         collected.extend(results)
         confidence = _confidence(results)
-        logger.info(f"[AGENT TOOL] search_internal — {len(results)} results, confidence={confidence}")
+        logger.info(f"[AGENT TOOL] search_hybrid — {len(results)} results, confidence={confidence}")
         return f"Found {len(results)} images (confidence {confidence:.0%}). Top: {results[0]['description'][:80] if results else 'none'}"
 
     @tool
     def search_clip(query: str) -> str:
-        """Search using CLIP visual embeddings. Best for moods, aesthetics, abstract feelings, color palettes, or visual scenes."""
+        """Search using CLIP visual embeddings. Best for visual moods, aesthetics, abstract feelings, color palettes, lighting, or atmospheric scenes where the vibe matters more than the subject."""
         try:
             results = _clip_search(query, size=request.limit * 2)
             collected.extend(results)
@@ -302,7 +343,7 @@ async def _run_react_agent(request: SearchRequest) -> SearchResponse:
             return f"Found {len(results)} visually similar images. Top: {results[0]['description'][:80] if results else 'none'}"
         except Exception as e:
             logger.warning(f"[AGENT TOOL] search_clip failed: {e}")
-            return f"CLIP search unavailable ({e}). Use search_internal instead."
+            return f"CLIP search unavailable ({e}). Use search_hybrid instead."
 
     @tool
     def search_external(query: str) -> str:
@@ -315,15 +356,15 @@ async def _run_react_agent(request: SearchRequest) -> SearchResponse:
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
     react = create_react_agent(
         llm,
-        [search_internal, search_clip, search_external],
+        [search_hybrid, search_clip, search_external],
         prompt=(
             "You are a visual asset search agent for a marketing team.\n\n"
             "Tool selection guide:\n"
-            "- search_internal: keyword BM25 search. Use for named subjects, objects, people, places, activities.\n"
-            "- search_clip: CLIP embedding search. Use for moods, aesthetics, abstract concepts, color palettes, visual scenes.\n"
+            "- search_hybrid: keyword + semantic search. Use for subjects, objects, people, places, activities, or any descriptive query.\n"
+            "- search_clip: CLIP visual embeddings. Use for moods, aesthetics, color palettes, lighting, or atmosphere — when the visual feel matters more than the subject.\n"
             "- search_external: Pexels fallback. Use ONLY when internal results are empty or fewer than 3.\n\n"
-            "You may call search_internal AND search_clip if both perspectives are useful — results will be merged.\n\n"
-            "After calling tools, write one concise sentence explaining which tool(s) you chose and why."
+            "Pick the single best tool. Only call both search_hybrid and search_clip if the query has a strong descriptive component AND a distinct visual mood.\n\n"
+            "After calling tools, write one concise sentence explaining which tool you chose and why."
         ),
     )
 
