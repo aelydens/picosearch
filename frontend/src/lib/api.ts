@@ -14,8 +14,7 @@ export async function searchImages(
   });
 
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Search failed (${res.status}): ${text}`);
+    throw new Error("Search failed. Please try again.");
   }
 
   return res.json() as Promise<SearchResponse>;

@@ -6,9 +6,11 @@ services:
     buildCommand: pip install uv && uv sync
     startCommand: uv run uvicorn main:app --host 0.0.0.0 --port $PORT
     envVars:
+      - key: ALLOWED_ORIGINS
+        sync: false
       - key: PEXELS_API_KEY
         sync: false
-      - key: ANTHROPIC_API_KEY
+      - key: OPENAI_API_KEY
         sync: false
       - key: OPENSEARCH_HOST
         sync: false

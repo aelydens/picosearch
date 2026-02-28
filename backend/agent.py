@@ -17,7 +17,7 @@ from langchain_core.messages import HumanMessage, ToolMessage
 from langchain_core.tools import tool
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
 
 # ---------------------------------------------------------------------------
@@ -28,9 +28,9 @@ SearchMode = Literal["auto", "keyword", "semantic", "hybrid", "clip"]
 
 
 class SearchRequest(BaseModel):
-    query: str
+    query: str = Field(..., min_length=1, max_length=200)
     mode: SearchMode = "auto"
-    limit: int = 12
+    limit: int = Field(default=12, ge=1, le=50)
 
 
 class ImageResult(BaseModel):
