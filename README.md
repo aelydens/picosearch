@@ -1,8 +1,6 @@
 # Picosearch
 
-**Demo application** — Multimodal asset search for marketing teams. Search your media library using natural language, visual concepts, or let an AI agent pick the best approach for your query.
-
-> This is a proof-of-concept demonstrating multimodal search patterns. The local CLIP model is a stand-in for a production inference endpoint — in a real deployment, you'd swap it for a hosted model service (e.g., AWS SageMaker, Replicate, or a self-hosted CLIP API) to handle scale and GPU requirements.
+Multimodal asset search demo app for marketing teams. Search your media library using natural language, visual concepts, or let an AI agent pick the best approach for your query.
 
 ![Picosearch search example](search-example.png)
 
