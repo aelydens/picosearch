@@ -8,11 +8,10 @@ Multimodal asset search demo app for marketing teams. Search your media library 
 
 Picosearch is a full-stack image search application that combines multiple search strategies to help marketing teams find the right visual assets. It supports:
 
-- **Keyword search** — Traditional text matching against image descriptions and tags
-- **Semantic search** — OpenAI embeddings for meaning-based description matching
-- **CLIP visual search** — Find images by visual mood, aesthetics, and atmosphere
-- **External search** — Pexels API fallback for stock imagery
-- **Agent mode** — A LangGraph ReAct agent that intelligently selects the best search strategy based on your query
+- **Hybrid search**: Combines traditional text matching against image descriptions and tags with OpenAI embeddings on descriptions via reciprocal rank fusion
+- **CLIP visual search**: Find images by visual mood, aesthetics, and atmosphere
+- **External search**: Pexels API fallback for stock imagery
+- **Agent mode**: A LangGraph agent that intelligently selects the best search strategy based on your query
 
 ## Architecture
 
