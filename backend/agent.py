@@ -174,7 +174,7 @@ def _embed_text(text: str) -> list[float]:
     return resp.data[0].embedding
 
 
-def _description_search(query: str, size: int = 20) -> list[dict]:
+def _description_embedding_search(query: str, size: int = 20) -> list[dict]:
     logger.info(f"[OS] description embedding search — query={query!r}")
     vector = _embed_text(query)
     resp = _os_client().search(
@@ -304,7 +304,7 @@ async def _run_external(request: SearchRequest) -> SearchResponse:
 async def _run_hybrid(request: SearchRequest) -> SearchResponse:
     size = request.limit * 2
     kw = _keyword_search(request.query, size=size)
-    desc = _description_search(request.query, size=size)
+    desc = _description_embedding_search(request.query, size=size)
     candidates = _rrf_merge([kw, desc])
     results = _rerank(request.query, candidates, request.limit)
     return SearchResponse(
@@ -326,7 +326,7 @@ async def _run_react_agent(request: SearchRequest) -> SearchResponse:
         """Search the internal library using keyword matching and semantic description embeddings fused with RRF. Best for descriptive, factual, or subject-based queries: people, places, objects, activities, or natural language descriptions."""
         size = request.limit * 2
         kw = _keyword_search(query, size=size)
-        desc = _description_search(query, size=size)
+        desc = _description_embedding_search(query, size=size)
         results = _rrf_merge([kw, desc])
         collected.extend(results)
         confidence = _confidence(results)
