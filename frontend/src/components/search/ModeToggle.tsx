@@ -29,7 +29,7 @@ export function ModeToggle({ value, onChange }: Props) {
           key={m.value}
           value={m.value}
           title={m.title}
-          className="h-8 px-3 text-xs font-medium data-[state=on]:bg-neutral-900 data-[state=on]:text-white"
+          className="h-8 px-3 text-xs font-medium data-[state=on]:bg-amber-400 data-[state=on]:text-amber-950 data-[state=on]:shadow-sm"
         >
           {m.label}
         </ToggleGroupItem>
