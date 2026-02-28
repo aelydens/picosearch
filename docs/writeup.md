@@ -12,7 +12,7 @@ This is a problem because marketing teams can have huge libraries, with thousand
 
 ### Evaluation questions / input-output pairs
 
-I created 10 input-output pairs to assess the application:
+I created several input-output pairs to assess the application both manually and via RAGAS:
 
 - "sunset over water" - images with sunsets, water, warm colors
 - "portrait of woman" - portrait photos of women
@@ -66,7 +66,7 @@ The "RAG" component of my project is not traditional document search, instead th
 
 ### Data sources and external APIs
 
-I used a subset of 2000 images from the Unsplash Lite open-source image dataset. This dataset includes descriptions and tags as well. I used the Pexels API as the source for the "external search" tool, so that the agent could decide to fall back to a broader stock image search if good matches weren't found in the media library itself. I embedded the images with the CLIP embedding model, and the image descriptions with the text-embedding-3-small model from OpenAI. This allows me to have richer semantic / visual search across the media library, as well as supporting keyword search on image text metadata.
+I used a subset of 2,000 images from the Unsplash Lite open-source image dataset. This dataset includes descriptions and tags as well. I used the Pexels API as the source for the "external search" tool, so that the agent could decide to fall back to a broader stock image search if good matches weren't found in the media library itself. I embedded the images with the CLIP embedding model, and the image descriptions with the text-embedding-3-small model from OpenAI. This allows me to have richer semantic / visual search across the media library, as well as supporting keyword search on image text metadata.
 
 ### Chunking strategy
 
@@ -82,7 +82,7 @@ I did not need a chunking strategy, since each image is a single document and my
 
 ### RAGAS evaluation
 
-For my answers to the Evals and Improving Your Prototype, please see my [RAGAS Evals Jupyter notebook](backend/notebooks/ragas_eval.ipynb).
+For my answers to the Evals and Improving Your Prototype sections, please see my [RAGAS Evals Jupyter notebook](../backend/notebooks/ragas_eval.ipynb).
 
 ## Task 7: Next Steps
 
