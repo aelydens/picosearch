@@ -4,11 +4,10 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { SearchMode } from "@/lib/types";
 
 const MODES: { value: SearchMode; label: string; title: string }[] = [
-  { value: "auto", label: "Auto", title: "Let the agent pick the best mode" },
-  { value: "keyword", label: "Keyword", title: "Exact keyword matching (BM25)" },
-  { value: "semantic", label: "Semantic", title: "Dense vector similarity" },
-  { value: "hybrid", label: "Hybrid", title: "Keyword + semantic fusion" },
+  { value: "agent", label: "Agent", title: "LLM agent picks the best tool(s) for your query" },
   { value: "clip", label: "CLIP", title: "Vision-language embedding search" },
+  { value: "hybrid", label: "Hybrid", title: "Keyword + CLIP fusion" },
+  { value: "external", label: "External", title: "Pexels stock photos only" },
 ];
 
 interface Props {

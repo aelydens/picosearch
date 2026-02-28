@@ -1,4 +1,4 @@
-export type SearchMode = "auto" | "keyword" | "semantic" | "hybrid" | "clip";
+export type SearchMode = "agent" | "clip" | "hybrid" | "external";
 
 export interface ImageResult {
   id: string;

@@ -24,6 +24,8 @@ frontend/out/
 # Jupyter
 .ipynb_checkpoints/
 notebooks/.ipynb_checkpoints/
+RUBRIC.md
+unsplash-os/*
 
 # OS
 .DS_Store

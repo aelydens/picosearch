@@ -1,17 +1,19 @@
 "use client";
 
-import type { ImageResult } from "@/lib/types";
+import type { ImageResult, SearchMode } from "@/lib/types";
 import { ImageCard } from "./ImageCard";
 import { MorphingLoader } from "./MorphingLoader";
 
 interface Props {
   results: ImageResult[];
   isLoading: boolean;
+  mode?: SearchMode;
 }
 
-export function ResultsGrid({ results, isLoading }: Props) {
+export function ResultsGrid({ results, isLoading, mode }: Props) {
   if (isLoading) {
-    return <MorphingLoader label="Searching your library…" size="lg" />;
+    const label = mode === "agent" ? "Agent is thinking…" : "Searching your library…";
+    return <MorphingLoader label={label} size="lg" />;
   }
 
   if (!results.length) return null;

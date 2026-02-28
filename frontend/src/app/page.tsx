@@ -1,6 +1,6 @@
 "use client";
 
-import { AutoModeInfo } from "@/components/search/AutoModeInfo";
+import { AgentModeInfo } from "@/components/search/AutoModeInfo";
 import { ResultsGrid } from "@/components/search/ResultsGrid";
 import { SearchBar } from "@/components/search/SearchBar";
 import { searchImages } from "@/lib/api";
@@ -11,7 +11,7 @@ import { useState } from "react";
 export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [response, setResponse] = useState<SearchResponse | null>(null);
-  const [requestedMode, setRequestedMode] = useState<SearchMode>("auto");
+  const [requestedMode, setRequestedMode] = useState<SearchMode>("agent");
   const [error, setError] = useState<string | null>(null);
 
   async function handleSearch(query: string, mode: SearchMode) {
@@ -102,7 +102,7 @@ export default function Home() {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
             >
-              <AutoModeInfo response={response} requestedMode={requestedMode} />
+              <AgentModeInfo response={response} requestedMode={requestedMode} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -119,6 +119,7 @@ export default function Home() {
             <ResultsGrid
               results={response?.results ?? []}
               isLoading={isLoading}
+              mode={requestedMode}
             />
           </section>
         )}

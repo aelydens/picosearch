@@ -14,7 +14,7 @@ interface Props {
 
 export function SearchBar({ onSearch, isLoading }: Props) {
   const [query, setQuery] = useState("");
-  const [mode, setMode] = useState<SearchMode>("auto");
+  const [mode, setMode] = useState<SearchMode>("agent");
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
