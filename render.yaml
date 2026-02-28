@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: picosearch-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install uv && uv sync
+    startCommand: uv run uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PEXELS_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENSEARCH_HOST
+        sync: false
+      - key: OPENSEARCH_USER
+        sync: false
+      - key: OPENSEARCH_PASSWORD
+        sync: false
+      - key: OPENSEARCH_INDEX
+        value: picosearch-assets
+      - key: PYTHON_VERSION
+        value: "3.12"
+    healthCheckPath: /health
+    autoDeploy: true
